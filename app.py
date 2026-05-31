@@ -183,18 +183,18 @@ if st.button("検索してAIに聞く"):
         st.error("データが読み込めていません。")
     else:
         st.write("---")
-        
-        # 3. 無料ローカル埋め込み検索で関係行を絞り込む
+
+        # 3. ローカル埋め込み検索で関係行を絞り込む
         selected_rows = retrieve_related_rows(df, user_question)
-        
+
         # 検索結果がゼロだった場合
         if len(selected_rows) == 0:
-            st.warning("スプレッドシートの中に、関係しそうな略語が見つかりませんでした。")
-            st.info("【AIへの指示】：すみません、提供された資料の中にはその略語は見つかりませんでした。")
-            
+            st.warning("辞書の中に、関係しそうな略語が見つかりませんでした。")
+            st.info("提供された資料の中にはその略語は見つかりませんでした。")
+
         # 検索結果が見つかった場合
         else:
-            st.success(f"ベクトル検索で {len(selected_rows)} 件の関係しそうなデータを見つけました！")
+            st.success(f"ベクトル検索で {len(selected_rows)} 件の関連データを見つけました。")
 
             abbr_col, full_col, meaning_col, usage_col, caution_col, related_col = CSV_COLUMNS
             ranking_df = pd.DataFrame(
@@ -208,7 +208,7 @@ if st.button("検索してAIに聞く"):
             )
             st.caption("検索上位（類似度）")
             st.dataframe(ranking_df, use_container_width=True, hide_index=True)
-            
+
             # 見つかった行をコンテキストとしてまとめる
             context_text = ""
             for idx, _ in selected_rows:
@@ -217,16 +217,16 @@ if st.button("検索してAIに聞く"):
                 context_text += f"  意味: {row[meaning_col]}\n"
                 context_text += f"  よく使う場面: {row[usage_col]}\n"
                 context_text += f"  注意点: {row[caution_col]}\n\n"
-            
+
             with st.expander("🔍 AIに渡すコンテキストの中身（クリックして確認）"):
                 st.code(context_text, language="text")
                 st.write("※辞書全体ではなく、類似度上位の行のみをコンテキストとしてAPIに送信しています。")
-            
-            # 4. APIに送るデータ（プロンプト）の作成
+
+            # 4. APIに送るプロンプトの作成
             prompt = f"""
             あなたは新人看護師を優しくサポートする先輩AIです。
             以下の情報をコンテキストとして使い、ユーザーの質問に優しく答えてください。
-            
+
             【厳守事項】
             1. 必ずコンテキストに書かれているデータ「のみ」を使って答えてください。
             2. コンテキストに書かれていないこと（一般的な医療知識など）は絶対に答えないでください。
@@ -235,14 +235,14 @@ if st.button("検索してAIに聞く"):
 
             【ユーザーの質問】: {user_question}
 
-            【コンテキストの内容】: 
+            【コンテキストの内容】:
             {context_text}
             """
-            
+
             st.subheader("🤖 AIの回答")
-            
+
             # -------------------------------------------------------------------
-            # 5. APIキーが有効な場合にのみGeminiを呼び出す
+            # 5. APIキーが有効な場合にのみ Gemini を呼び出す
             # -------------------------------------------------------------------
             valid_api_key = api_key and api_key.startswith("AIza")
             if valid_api_key:
@@ -264,4 +264,3 @@ if st.button("検索してAIに聞く"):
                     st.error("Gemini APIキーが未設定です。サイドバーか st.secrets に有効なキーを設定してください。")
                 st.info("💡 有効なキーがないため、テストモードで動作しています。")
                 st.write(f"（APIキーを入力すると、Geminiから以下のような回答が返ってきます）\n\n**テスト回答:** お疲れ様です！お探しの略語については以下の通りです。\n\n{context_text}\n現場で使うときは、特に「注意点」に気をつけてくださいね！")
-
