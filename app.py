@@ -113,7 +113,7 @@ st.markdown(
 # -------------------------------------------------------------------
 st.sidebar.header("⚙️ 設定")
 # APIキーは st.secrets を優先し、未設定時にサイドバー入力にフォールバックする
-secret_api_key = st.secrets.get("GEMINI_API_KEY")
+secret_api_key = st.secrets.get("GEMINI_API_KEY", None)
 api_key_input = st.sidebar.text_input("Gemini APIキーを入力してください（AIza...）", type="password")
 api_key = secret_api_key or api_key_input
 
