@@ -37,6 +37,22 @@ cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 secrets.toml は .gitignore により Git にコミットされません。
 サイドバーからの直接入力も可能ですが、共有端末での利用は推奨しません。
 
+## Railway での公開
+このリポジトリは Railway でそのまま動かせます。
+
+1. Railway にログインし、GitHub 連携でこのリポジトリを選択します。
+2. `Requirements` は `requirements.txt` を使います。
+3. Start Command に以下を設定します。
+
+```bash
+streamlit run app.py --server.port $PORT --server.address=0.0.0.0
+```
+
+4. Railway の環境変数に `GEMINI_API_KEY` を登録します。
+5. デプロイ後、Railway が割り当てる URL でアプリを利用できます。
+
+`PORT` は Railway 側で自動的に設定されるので、設定不要です。
+
 ## 使い方
 1. サイドバーでデータを確認
 2. 質問欄に略語や症状を入力
