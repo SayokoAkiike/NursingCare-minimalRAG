@@ -124,7 +124,12 @@ st.sidebar.header("📄 現在のデータ（コンテキスト）")
 @st.cache_data
 def load_data():
     try:
-        return pd.read_csv("data.csv")
+        df = pd.read_csv("data.csv", encoding="utf-8")
+        missing = [c for c in CSV_COLUMNS if c not in df.columns]
+        if missing:
+            st.error(f"data.csv に必要な列がありません: {missing}")
+            return pd.DataFrame()
+        return df
     except FileNotFoundError:
         st.error("data.csvが見つかりません。")
         return pd.DataFrame()
@@ -215,7 +220,7 @@ if st.button("検索してAIに聞く"):
             
             with st.expander("🔍 AIに渡すコンテキストの中身（クリックして確認）"):
                 st.code(context_text, language="text")
-                st.write("※スプレッドシート全体ではなく、見つけたこの文字だけをAPIに送るから安く安全に済みます！")
+                st.write("※辞書全体ではなく、類似度上位の行のみをコンテキストとしてAPIに送信しています。")
             
             # 4. APIに送るデータ（プロンプト）の作成
             prompt = f"""

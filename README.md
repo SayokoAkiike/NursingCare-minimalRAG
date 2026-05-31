@@ -25,6 +25,15 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+### APIキーの設定（推奨）
+```bash
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+# secrets.toml を開いて GEMINI_API_KEY に実際のキーを入力
+```
+
+secrets.toml は .gitignore により Git にコミットされません。
+サイドバーからの直接入力も可能ですが、共有端末での利用は推奨しません。
+
 ## 使い方
 1. サイドバーでデータを確認
 2. 質問欄に略語や症状を入力
