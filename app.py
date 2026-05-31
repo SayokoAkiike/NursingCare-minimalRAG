@@ -4,6 +4,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from google import genai
 
+CSV_COLUMNS = ["略語", "正式名称", "意味", "よく使う場面", "注意点", "関連語"]
+
 # -------------------------------------------------------------------
 # ページ設定
 # -------------------------------------------------------------------
@@ -110,11 +112,13 @@ st.markdown(
 # サイドバー：設定とデータ表示
 # -------------------------------------------------------------------
 st.sidebar.header("⚙️ 設定")
-# ここでAPIキーを入力できるようにする
-api_key = st.sidebar.text_input("Gemini APIキーを入力してください（AIza...）", type="password")
+# APIキーは st.secrets を優先し、未設定時にサイドバー入力にフォールバックする
+secret_api_key = st.secrets.get("GEMINI_API_KEY")
+api_key_input = st.sidebar.text_input("Gemini APIキーを入力してください（AIza...）", type="password")
+api_key = secret_api_key or api_key_input
 
 st.sidebar.markdown("---")
-st.sidebar.header("📄 現在のデータ（カンニングペーパー）")
+st.sidebar.header("📄 現在のデータ（コンテキスト）")
 
 # 1. データの読み込み
 @st.cache_data
@@ -127,16 +131,7 @@ def load_data():
 
 
 def row_to_text(row):
-    return " ".join(
-        [
-            str(row.get("略語", "")),
-            str(row.get("正式名称", "")),
-            str(row.get("意味", "")),
-            str(row.get("よく使う場面", "")),
-            str(row.get("注意点", "")),
-            str(row.get("関連語", "")),
-        ]
-    )
+    return " ".join(str(row.get(col, "")) for col in CSV_COLUMNS)
 
 
 @st.cache_resource
@@ -196,10 +191,11 @@ if st.button("検索してAIに聞く"):
         else:
             st.success(f"ベクトル検索で {len(selected_rows)} 件の関係しそうなデータを見つけました！")
 
+            abbr_col, full_col, meaning_col, usage_col, caution_col, related_col = CSV_COLUMNS
             ranking_df = pd.DataFrame(
                 [
                     {
-                        "略語": df.iloc[idx]["略語"],
+                        "略語": df.iloc[idx][abbr_col],
                         "類似度": f"{score:.3f}",
                     }
                     for idx, score in selected_rows
@@ -208,61 +204,59 @@ if st.button("検索してAIに聞く"):
             st.caption("検索上位（類似度）")
             st.dataframe(ranking_df, use_container_width=True, hide_index=True)
             
-            # 見つけた数件だけのデータを、APIに渡すための文字（テキスト）にまとめる
+            # 見つかった行をコンテキストとしてまとめる
             context_text = ""
             for idx, _ in selected_rows:
                 row = df.iloc[idx]
-                context_text += f"・略語: {row['略語']} (正式名称: {row['正式名称']})\n"
-                context_text += f"  意味: {row['意味']}\n"
-                context_text += f"  よく使う場面: {row['よく使う場面']}\n"
-                context_text += f"  注意点: {row['注意点']}\n\n"
+                context_text += f"・略語: {row[abbr_col]} (正式名称: {row[full_col]})\n"
+                context_text += f"  意味: {row[meaning_col]}\n"
+                context_text += f"  よく使う場面: {row[usage_col]}\n"
+                context_text += f"  注意点: {row[caution_col]}\n\n"
             
-            with st.expander("🔍 AIに渡すカンニングペーパーの中身（クリックして確認）"):
+            with st.expander("🔍 AIに渡すコンテキストの中身（クリックして確認）"):
                 st.code(context_text, language="text")
                 st.write("※スプレッドシート全体ではなく、見つけたこの文字だけをAPIに送るから安く安全に済みます！")
             
             # 4. APIに送るデータ（プロンプト）の作成
             prompt = f"""
             あなたは新人看護師を優しくサポートする先輩AIです。
-            以下の情報を「カンニングペーパー」として使い、ユーザーの質問に優しく答えてください。
+            以下の情報をコンテキストとして使い、ユーザーの質問に優しく答えてください。
             
             【厳守事項】
-            1. 必ずカンニングペーパーに書かれているデータ「のみ」を使って答えてください。
-            2. カンニングペーパーに書かれていないこと（一般的な医療知識など）は絶対に答えないでください。
+            1. 必ずコンテキストに書かれているデータ「のみ」を使って答えてください。
+            2. コンテキストに書かれていないこと（一般的な医療知識など）は絶対に答えないでください。
             3. 分からないことや資料にないことは「資料にありません」と素直に答えてください。
             4. 現場で使うときの「注意点」があれば、必ず添えてあげてください。
 
             【ユーザーの質問】: {user_question}
 
-            【カンニングペーパーの内容】: 
+            【コンテキストの内容】: 
             {context_text}
             """
             
             st.subheader("🤖 AIの回答")
             
             # -------------------------------------------------------------------
-            # 5. APIキーが入力されている場合のみ、本物のGeminiを呼び出す
+            # 5. APIキーが有効な場合にのみGeminiを呼び出す
             # -------------------------------------------------------------------
-            if api_key.startswith("AIza"):
+            valid_api_key = api_key and api_key.startswith("AIza")
+            if valid_api_key:
                 try:
-                    # 本物のAIと通信中...
+                    # Gemini APIクライアントを初期化してリクエストを実行する
                     with st.spinner("Geminiが回答を生成しています..."):
-                        # Gemini APIクライアントの準備
                         client = genai.Client(api_key=api_key)
-                        
-                        # Geminiモデル（gemini-2.5-flashなど）を呼び出す
                         response = client.models.generate_content(
                             model='gemini-2.5-flash',
                             contents=prompt
                         )
-                        
-                        # 結果の表示
                         st.write(response.text)
-                        
                 except Exception as e:
                     st.error(f"エラーが発生しました（APIキーが間違っているか、通信エラーです）: {e}")
             else:
-                # APIキーがない場合は今まで通りのテストモード（ダミー）
-                st.info("💡 画面左側のサイドバーに有効なGemini APIキー（AIza...）が入力されていないため、【テストモード】で動かしています。")
+                if api_key:
+                    st.error("入力されたGemini APIキーが無効です。AIzaで始まる有効なキーを入力してください。")
+                else:
+                    st.error("Gemini APIキーが未設定です。サイドバーか st.secrets に有効なキーを設定してください。")
+                st.info("💡 有効なキーがないため、テストモードで動作しています。")
                 st.write(f"（APIキーを入力すると、Geminiから以下のような回答が返ってきます）\n\n**テスト回答:** お疲れ様です！お探しの略語については以下の通りです。\n\n{context_text}\n現場で使うときは、特に「注意点」に気をつけてくださいね！")
 
